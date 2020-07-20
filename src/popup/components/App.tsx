@@ -30,8 +30,8 @@ export default () => {
       if (result.status === RecState.ON) setRecStatus(RecState.ON);
       else if (result.status === RecState.PAUSED) setRecStatus(RecState.PAUSED);
     });
-    chrome.tabs.query({ active: true, currentWindow: true }, activeTab => {
-      if (activeTab[0].url.startsWith('chrome://')) setIsValidTab(false);
+    chrome.tabs.query({ active: true, currentWindow: true }, ([activeTab]) => {
+      if (activeTab.url.startsWith('chrome://')) setIsValidTab(false);
     });
   }, []);
 
@@ -47,21 +47,21 @@ export default () => {
     return () => {
       chrome.runtime.onMessage.removeListener(handleMessageFromBackground);
     };
-  }, []);
+  }, [isValidTab]);
 
-  const handleToggle = (action: ControlAction): void => {
+  const handleToggle = React.useCallback((action: ControlAction): void => {
     if (shouldInfoDisplay) setShouldInfoDisplay(false);
     if (action === ControlAction.START) startRecording();
     else if (action === ControlAction.STOP) stopRecording();
     else if (action === ControlAction.RESET) resetRecording();
     chrome.runtime.sendMessage({ type: action });
-  };
+  }, [shouldInfoDisplay]);
 
-  const toggleInfoDisplay = (): void => {
+  const toggleInfoDisplay = React.useCallback((): void => {
     setShouldInfoDisplay(should => !should);
-  };
+  }, []);
 
-  const copyToClipboard = async (): Promise<void> => {
+  const copyToClipboard = React.useCallback(async (): Promise<void> => {
     try {
       let toBeCopied: string = '';
       for (let i = 0; i !== codeBlocks.length; i += 1) {
@@ -71,26 +71,27 @@ export default () => {
     } catch (error) {
       throw new Error(error);
     }
-  };
+  }, [codeBlocks]);
 
-  const destroyBlock = (index: number): void => {
+  const destroyBlock = React.useCallback((index: number): void => {
     setCodeBlocks(prevBlocks => prevBlocks.filter((block, i) => i !== index));
     chrome.runtime.sendMessage({
       type: ControlAction.DELETE,
       payload: index,
     });
-  };
+  }, []);
 
-  const moveBlock = (dragIdx: number, dropIdx: number): void => {
-    const temp = [...codeBlocks];
-    const dragged = temp.splice(dragIdx, 1)[0];
-    temp.splice(dropIdx, 0, dragged);
-    setCodeBlocks(temp);
+  const moveBlock = React.useCallback((dragIdx: number, dropIdx: number): void => {
+    setCodeBlocks(prevBlocks => {
+      const dragged = prevBlocks.splice(dragIdx, 1)[0]
+      prevBlocks.splice(dropIdx, 0, dragged)
+      return prevBlocks
+    })
     chrome.runtime.sendMessage({
       type: ControlAction.MOVE,
       payload: { dragIdx, dropIdx },
     });
-  };
+  }, []);
 
   return (
     <div id="App">
